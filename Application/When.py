@@ -57,16 +57,10 @@ def extractNoun(possed_data):
     return result[0:len(result)-1]
 
 
-            
-
 def processQuestion(questionSentence): 
     tokenized_data = nltk.word_tokenize(questionSentence)
     possed_data = nltk.pos_tag(tokenized_data)
     return extractNoun(possed_data)
-
-
-
-
 
 
 @app.route("/",methods=['GET','POST'])
@@ -77,10 +71,9 @@ def hello():
 	 name = processQuestion(question)
 	 print name
 	 lst = prepareDataForProccessing(name)
+	 print lst
 	 if len(lst)>0:
 	 	return extract(lst)
-	 return "sss"
-	 return "<p>Ok dddd</p>"
 	return """<img style="width:400px;height:400px;margin-top:10%;margin-left:40%" src='http://orig02.deviantart.net/9915/f/2008/349/f/5/corpse_bride_by_linalightning.jpg' ><form style="margin-left:40%;margin-top:12%" action='/' method='POST'>
               <input style="width:400px;height:80px;" name='gozde' type= 'text'>
               <input type = 'submit'></form>"""
