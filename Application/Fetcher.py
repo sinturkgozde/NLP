@@ -12,10 +12,10 @@ def fetchDataForProcessing(NAME):
     data = urllib2.urlopen(wiki_link_first_part+NAME+wiki_link_end_part).read().decode('utf8')
     return data
 
-def fetcherSynonym(word):
+"""def fetcherSynonym(word):
     url = "http://thesaurus.altervista.org/thesaurus/v1?key=rokG4BhtuF68i0G6qU8G&word="+word+"&language=en_US&output=json"
     data = urllib2.urlopen(url).read().decode('iso-8859-9').encode('utf-8',',ignore')
-    return json.loads(data)["response"]
+    return json.loads(data)["response"]"""
 
 
 url = "https://en.wikipedia.org/wiki/Mahatma_Gandhi"
@@ -27,15 +27,15 @@ def myGetForTest():
     return raw[:raw.index("References\n\n")]
 
 
-def creatingSynonymThearus(word):
+"""def creatingSynonymThearus(word):
     similar_words = []
     for element in fetcherSynonym(word):
          for word in element["list"]["synonyms"].split("|"):
             similar_words.append(word)
             
-    return similar_words
+    return similar_words"""
 
-def generateSynonymList(word):
+"""def generateSynonymList(word):
  allSynonym = []
  for x in creatingSynonymThearus(word):
     for el in wn.synsets(x):
@@ -45,7 +45,27 @@ def generateSynonymList(word):
     for el in element.lemma_names():
         if el not in result:
          result.append(el)
+ return result"""
+ 
+def generateSynonymList(word):
+ result=[]
+ for array in wn.synsets("kill"):
+    for element in array.lemma_names():
+        result.append(element) if element not in result else ""
  return result
 
 def makeHyponyms(word):
     return wn.synset(word+'.v.01').hyponyms()
+    
+    
+def prepareHyponyms(word):
+  result = []
+  data = makeHyponyms(word)
+  for element in data:
+     result.append(str(element.name())[0:])
+  return map(lambda x:x[0:x.index(".")],result)   
+  
+  
+def merge_Hyp_Sys(word):
+ return prepareHyponyms(word)+generateSynonymList(word)  
+
