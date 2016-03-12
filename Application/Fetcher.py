@@ -1,3 +1,6 @@
+from bs4 import BeautifulSoup
+
+from nltk.corpus import wordnet as wn
 
 import urllib2
 
@@ -21,7 +24,7 @@ def myGetForTest():
     html = urllib2.urlopen(url).read().decode('iso-8859-9').encode('utf-8',',ignore')
     soup = BeautifulSoup(html,"html.parser")
     raw = soup.get_text()
-    return raw
+    return raw[:raw.index("References\n\n")]
 
 
 def creatingSynonymThearus(word):
