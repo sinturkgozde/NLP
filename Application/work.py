@@ -4,15 +4,45 @@ from gensim.models import Word2Vec
 from nltk.stem.porter import *
 from nltk.stem import WordNetLemmatizer
 import nltk
-import urllib2
 from nltk.corpus import stopwords
 import wikipedia
+import searchAnswer
+import clientSocket
+import QuestionClassification as Qc
 
 
-def myGetForTest(name):
-    data = wikipedia.page(name)
-    raw_text = data.content
-    return raw_text.replace("\n","").replace("=","").replace('\\',"").split(".")
+print "Model is loading..."
+model = Word2Vec.load("our.model")
+
+
+
+
+def possingData(sentence):
+	stems = []
+	wl =WordNetLemmatizer()
+	for word in sentence.split(" "):
+		stems.append(wl.lemmatize(word))
+	question_tokenized = nltk.word_tokenize(' '.join(stems))
+	return nltk.pos_tag(question_tokenized)
+
+def findingPossibleName(posed_data):
+	noun = []
+	for element in posed_data:
+		if 'NN' in element[1]:
+			noun.append(element[0])
+	if len(noun)<= 1:
+		return noun
+	bigrams = nltk.bigrams(noun)
+	nlist = []
+	for grams in bigrams:
+		noun = grams[0]+ " "+grams[1]
+		nlist.append(noun)
+	return nlist
+
+def myGetForTest(possibleNameList):
+	for i in possibleNameList:
+	 	if wikipedia.search(i) is not [] :
+			return wikipedia.page(i).content.replace("\n","").replace("=","").replace('\\',"").split(".")
 
 url = "https://en.wikipedia.org/wiki/Mahatma_Gandhi"
 
@@ -49,37 +79,34 @@ def loadModel(modelLink=0):
 def loadModel_two(name):
 	return Word2Vec.load(name)
 
-def extractSimilarSentences(noun,verb,data,model):
+def extractSimilarSentences(noun,verb,data,question):
 	stemmer = PorterStemmer()
 	wordnet_lemmatizer = WordNetLemmatizer()
 	sim_hyp_verb= helper.merge_Hyp_Sys(verb)
-	print noun
 	sim_hyp_verb= filter(lambda x: x in model.vocab, sim_hyp_verb)
 	similarity_checking= filter(lambda x:model.similarity(x,verb) > 0.35, sim_hyp_verb)
 	sentence_no = 0
 	result_array=[]
 	for sentence in data:
+		#recieved_data_from_server = clientSocket.analyzeSentence(sentence)
 		for word in nltk.word_tokenize(sentence):
-			if stemmer.stem(word) in map(lambda x:stemmer.stem(x),similarity_checking) and noun in sentence	: 
+			if stemmer.stem(word) in map(lambda x:stemmer.stem(x),similarity_checking) : 
 				result_array.append(str(sentence_no) +" "+sentence+"<br><br>")
 		sentence_no = sentence_no+1
-	print sentence_no
-
 	return result_array
 
 
 
 
 
+#and searchAnswer.checkIfTag(classifier_tag,recieved_data_from_server)
+
+
+ 
 
 
 
-#data = extractNounAndVerb("Who discoverd America?")
 
-#result =  myGetForTest(data["name"]) 
-
-
-model = Word2Vec.load("our.model")
 
 
 
@@ -88,7 +115,38 @@ model = Word2Vec.load("our.model")
 #soup = BeautifulSoup(html,"html.parser")
 #raw = soup.get_text()
 #second_data = raw[:raw.index("References\n\n")].split(".")
-#print extractSimilarSentences(data["name"],data["verb"],result,model)
+
+def extractWithStanfordNer(question):
+	#data = extractNounAndVerb(question)
+	text =  searchContext(question)
+	result = extractSimilarSentences(text[1],text[2],text[0],question)
+	arr = Qc.readData("train_5500.label")
+	classifier = Qc.trainMachine(arr[0],arr[1])
+	classifier_tag = Qc.classify_question(classifier,[question]) 
+	lastResult = []
+	for sentence in result:
+		recieved_data_from_server = clientSocket.analyzeSentence(sentence)
+		if searchAnswer.checkIfTag(classifier_tag,recieved_data_from_server):
+			lastResult.append(sentence)
+	return lastResult		
+
+
+
+def searchContext(sentence):
+	stemmer2 = PorterStemmer()
+	stop_words = stopwords.words("english")
+	posed_data = possingData(sentence)
+	verb = [element for element in posed_data if  'VB' in element[1] and element[0] not in stop_words ]
+	verb =  stemmer2.stem(verb[0][0])
+	nlist = findingPossibleName(posed_data)
+	name = nlist[0]
+	return (myGetForTest(nlist), name , verb)
+
+
+
+
+
+
 #print extractSimilarSentences("Gandhi","kill",second_data,model)[4]
 #print (x for x in extractSimilarSentences("Gandhi","kill",second_data,model))  
 

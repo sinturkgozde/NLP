@@ -40,11 +40,6 @@ def prepareHyponyms(word):
 def merge_Hyp_Sys(word):
  return prepareHyponyms(word)+generateSynonymList(word) 
 
-print makeHyponyms("find")
-print prepareHyponyms("find")
-print generateSynonymList("find")
-print merge_Hyp_Sys("find")
-
 
 
 

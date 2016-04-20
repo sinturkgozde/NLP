@@ -21,7 +21,7 @@ question_tokenized = nltk.word_tokenize(' '.join(stems))
 
 posed_data = nltk.pos_tag(question_tokenized)
 
-print posed_data
+
 
 VERBS = [element for element in posed_data if  'VB' in element[1]]
 
@@ -41,4 +41,3 @@ hyponymArray = []
 for element in closest_6:
      hyponymArray.append(str(element.name())[0:str(element.name()).index(".")])
 
-print hyponymArray
