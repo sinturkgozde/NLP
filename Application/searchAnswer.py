@@ -5,14 +5,10 @@ import clientSocket
 
 
 test_question = "Where is the biggest city in the world"
-
 arr = Qc.readData("train_5500.label")
-
 classifier = Qc.trainMachine(arr[0],arr[1])
-
 classifier_tag = Qc.classify_question(classifier,[test_question])
-
-
+resultArray = [["Linus Torvalds,Ken"],["Richard","Kerem"]]
 
 
 
@@ -20,11 +16,11 @@ classifier_tag = Qc.classify_question(classifier,[test_question])
 
 def checkIfTag(classifier_tag,recieved_data_from_server):
 	if classifier_tag[0] == "HUM":
-		return "/PERSON" in recieved_data_from_server
+		return ("/PERSON" in recieved_data_from_server,recieved_data_from_server,"/PERSON")
 	elif classifier_tag[0] == "ENTIY":
-		return "/ORGANIZATION" in recieved_data_from_server
+		return ("/ORGANIZATION" in recieved_data_from_server,recieved_data_from_server,"/ORGANIZATION")
 	elif classifier_tag[0] == "LOC":
-		return "/LOCATION" in recieved_data_from_server
+		return ("/LOCATION" in recieved_data_from_server,recieved_data_from_server,"/LOCATION")
 
 #sentence = raw_input("Enter a sentence:")
 

@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 
 
-model = work.loadModel_two("our.model")
+#model = work.loadModel_two("our.model")
 
 
 @app.route("/",methods=['GET','POST'])
@@ -18,7 +18,8 @@ def hello():
 	if request.method == 'POST':
 		question = request.form.get('gozde')
 		result = work.extractWithStanfordNer(question)
-		return str(result)
+		resultCon = reduce(lambda x,y:x+"<br>"+y,result)
+		return str(resultCon)
 
 	return """<img style="width:400px;height:400px;margin-top:10%;margin-left:40%" src='https://upload.wikimedia.org/wikipedia/commons/b/b0/PHAROS2006.jpg' >
 	           <form style="margin-left:36%;margin-top:12%" action='/' method='POST'>

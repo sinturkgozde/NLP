@@ -17,9 +17,7 @@ def sendMessage(s, sentence):
 	data = s.recv(2048)
 	return data
 		
-
-
-
+		
 def analyzeSentence(sentence):
 	s = initConnect()
 	data =  sendMessage(s,sentence+"\n")
