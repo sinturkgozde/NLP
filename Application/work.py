@@ -9,12 +9,18 @@ import searchAnswer
 import clientSocket
 import QuestionClassification as Qc
 import exceptions
+import multiprocessing
+from functools import partial
+import wikipedia
+from dateutil.parser import _timelex, parser
+from nltk.util import ngrams
 
 
 print "Model is loading..."
 model = Word2Vec.load("our.model")
 print "Model is loaded"
 stop_words = stopwords.words("english")
+
 
 print "training question"
 arr = Qc.readData("train_5500.label")
@@ -29,43 +35,96 @@ def possingData(sentence):
 			stems.append(wl.lemmatize(word))
 		else:
 			stems.append(word)
+	
 	question_tokenized = nltk.word_tokenize(' '.join(stems))
 	return nltk.pos_tag(question_tokenized)
 
+
+
+
+
+p = parser()
+info = p.info
+
+def timetoken(token):
+  try:
+    float(token)
+    return True
+  except ValueError:
+    pass
+  return any(f(token) for f in (info.jump,info.weekday,info.month,info.hms,info.ampm,info.pertain,info.utczone,info.tzoffset))
+
+def timesplit(input_string):
+  batch = []
+  for token in _timelex(input_string):
+    if timetoken(token):
+      if info.jump(token):
+        continue
+      batch.append(token)
+    else:
+      if batch:
+        yield " ".join(batch)
+        batch = []
+  if batch:
+    yield " ".join(batch)
+
+def extractDates(text):
+    result = []
+    for sentence in text:
+        sentence = sentence[1:].encode('ascii', 'ignore').decode('ascii')
+        for elem in timesplit(sentence):
+			if elem != 's':
+				result.append(sentence)
+    return result
+
+
 def findingPossibleName(posed_data):
 	noun = []
-	for element in posed_data:
-		if 'NN' in element[1]:
-			noun.append(element[0])
-	if len(noun)<= 1:
-		return noun
-	bigrams = nltk.bigrams(noun)
 	nlist = []
-	for grams in bigrams:
-		noun = grams[0]+ " "+grams[1]
-		nlist.append(noun)
+	print posed_data
+	for element in posed_data:
+		if "NN" in element[1]:
+			print element
+			noun.append(element[0])
+	if len(noun) <= 1:
+		return noun
+	for i in range(0,len(noun)+1):
+		aa = ngrams(noun, i+1)
+		print "Yeter yeter"
+		for a in aa:
+			st = ""
+			for i in range(0,len(a)):
+				st = st + " " + a[i]
+			nlist.append(st)
+	print nlist
 	return nlist
+
+def findWiki(nlist):
+	print "findWiki"
+	nameList = []
+	for i in nlist:
+		try:
+			for element in wikipedia.search(i):
+				if wikipedia.page(i).title == wikipedia.page(element).title:
+					nameList.append(i)
+		except:
+			pass
+	print nameList
+	name = max(nameList, key=len)
+	print "findWiki" + name 
+	wiki =wikipedia.page(name).content.replace("\n","").replace("=","").replace('\\',"").split(".")	
+	org_name = wikipedia.page(name).title.decode('iso-8859-9').encode('utf-8',',ignore')	
+	org_name_indexed = org_name[0:org_name.index(" (")]
+	print "cokmedim burada" + org_name_indexed
+	return (wiki,org_name_indexed) 
+
+
+
 
 def myGetForTest(possibleNameList):
 	for i in possibleNameList:
 	 	if wikipedia.search(i) is not [] :
 			return wikipedia.page(i).content.replace("\n","").replace("=","").replace('\\',"").split(".")
-
-url = "https://en.wikipedia.org/wiki/Mahatma_Gandhi"
-
-
-def extractNounAndVerb(sentence):
-	stemmer2 = PorterStemmer()
-	wordnet_lemmatizer = WordNetLemmatizer()
-	stop_words = stopwords.words("english")
-	stems = stemmer(sentence)
-	question_tokenized = nltk.word_tokenize(' '.join(stems))
-	posed_data = nltk.pos_tag(question_tokenized)
-	verb = [element for element in posed_data if  'VB' in element[1] and element[0] not in stop_words ]
-	verb =  stemmer2.stem(verb[0][0])
-	nnps = [element for element in posed_data if  'NN' in element[1]]
-	return {"verb": verb.decode('utf8'),"name":nnps[0][0]}
-
 
 def stemmer(sentence):
 	word_list = []
@@ -80,27 +139,30 @@ def stemmer(sentence):
 
 	return word_list
 
-def loadModel(modelLink=0):
-	return Word2Vec.load_word2vec_format('/Users/Kerem/Downloads/GoogleNews-vectors-negative300.bin', binary=True)
-
-def loadModel_two(name):
-	return Word2Vec.load(name)
 
 def extractSimilarSentences(noun,verb,data,question):
 	stemmer = PorterStemmer()
 	wordnet_lemmatizer = WordNetLemmatizer()
-	sim_hyp_verb= helper.merge_Hyp_Sys(verb)
-	sim_hyp_verb= filter(lambda x: x in model.vocab, sim_hyp_verb)
-	similarity_checking= filter(lambda x:model.similarity(x,verb) > 0.35, sim_hyp_verb)
-	sentence_no = 0
 	result_array=[]
-	for sentence in data:
-		#recieved_data_from_server = clientSocket.analyzeSentence(sentence)
-		for word in nltk.word_tokenize(sentence):
-			if stemmer.stem(word) in map(lambda x:stemmer.stem(x),similarity_checking) :
-				result_array.append(str(sentence_no) +" "+sentence+"<br><br>")
-		sentence_no = sentence_no+1
-	return result_array
+	print verb
+	if verb not in stop_words:
+		sim_hyp_verb= helper.merge_Hyp_Sys(verb)
+		sim_hyp_verb= filter(lambda x: x in model.vocab, sim_hyp_verb)
+		similarity_checking= filter(lambda x:model.similarity(x,verb) > 0.35, sim_hyp_verb)
+		sentence_no = 0
+		
+		for sentence in data:
+			#recieved_data_from_server = clientSocket.analyzeSentence(sentence)
+			for word in nltk.word_tokenize(sentence):
+				if stemmer.stem(word) in map(lambda x:stemmer.stem(x),similarity_checking) :
+					result_array.append(str(sentence_no) +" "+sentence)
+		return result_array					
+	elif verb in stop_words:
+		for elem in data:
+			result_array.append(elem)
+			
+		return result_array
+	
 
 
 
@@ -132,33 +194,40 @@ def extractRelations(splitted_sentence,classifier_tag,resultArray):
 
 
 
+def extractPossible2(searchNoun ,noun):
+    content = ""
+    try:
+        searchNounTitle = wikipedia.page(searchNoun).title
+        nounTitle = wikipedia.page(noun).title
+        if len(wikipedia.search(noun)) > 0 and searchNoun != wikipedia.search(noun)[0] and searchNounTitle != nounTitle:
+            content = wikipedia.page(noun).content
+    except Exception:
+        pass
+    return content
+def start_process():
+    print 'Starting', multiprocessing.current_process().name
+	
+def countSuccessful2(array,searchNoun):
+	func = partial(extractPossible2, searchNoun)
+	pool_size =multiprocessing.cpu_count() * 2
+	#pool_size = multiprocessing.Pool(len(array))
+	pool =multiprocessing.Pool(processes=pool_size,initializer=start_process )                          
+                                
+	
+	results = pool.map(func, array)
+	
+	mainResult = []
+	for i in range(0, len(array)):
+		print i
+		mainResult.append(searchTermInDoc(results[i],searchNoun,array[i]))
+	
+	pool.close()
+	pool.join()
+    
+	pool.terminate()
+	print results
+	return mainResult	
 
-
-
-
-
-
-def extractPossible(noun,searchNoun):
-	content = ""
-	try:
-		searchNounTitle = wikipedia.page(searchNoun).title
-		nounTitle = wikipedia.page(noun).title
-		if len(wikipedia.search(noun)) > 0 and searchNoun != wikipedia.search(noun)[0] and searchNounTitle != nounTitle:
-			content = wikipedia.page(noun).content
-	except Exception:
-		pass
-	return content
-
-def isExistinWikipedia(name):
-	try:
-		wikipedia.page(name).content
-		return True
-	except Exception:
-		pass
-	return False
-
-def contentOfRelations(arr):
-	return map(lambda x:extractPossible(x),arr)
 
 def searchTermInDoc(doc,term,title):
 	counter  = 0
@@ -167,12 +236,7 @@ def searchTermInDoc(doc,term,title):
 	for sentence in sentences:
 		if term in sentence:
 			counter = counter+1
-	return str({title:counter})
-
-
-def countSucessful(array,searchNoun):
-	return map(lambda x:searchTermInDoc(extractPossible(x,searchNoun),searchNoun,x),array)
-
+	return {title:counter}
 
 
 
@@ -181,66 +245,154 @@ def countSucessful(array,searchNoun):
 #html = urllib2.urlopen(url).read().decode('iso-8859-9').encode('utf-8',',ignore')
 #soup = BeautifulSoup(html,"html.parser")
 #raw = soup.get_text()
-#second_data = raw[:raw.index("References\n\n")].split(".")
+#second_data = raw[:raw.index("Refereinces\n\n")].split(".")
 
+def findMaximumAnswer(listCountedName):
+	print "findMaximumAnswer"
+	maxValue = 0
+	correctAnswer = {}
+	max_key = ""
+	print listCountedName
+	for element in listCountedName:
+		print element
+		for key, value in element.iteritems():
+			if value >= maxValue:
+				print key, value
+				maxValue = value
+				correctAnswer = element
+	print correctAnswer
+	return correctAnswer
 
-
-
-def filterArray(array,noun):
-    resultArray = []
-    found = False
-    counter = 1
-    titled = wikipedia.page(noun).title
-    while counter < len(array):
-        if isExistinWikipedia(array[counter]) and noun != array[counter] and wikipedia.page(array[counter]).title == titled:
-            array.pop(counter)
-            found = True
-        else:
-            counter = counter+1
-    return array
-
-
-
-def resultAnswers(testArray):
- resultArray = []
- for element in testArray:
-    resultArray = filterArray(testArray,element)
-    print resultArray
- return resultArray
-
+def extractCorrectAnswers(result):
+	greatest = findMaximumAnswer(result)
+	max_no = 0
+	max_name = ""
+	print "ExtractCorrectAnswer 1"
+	for k,v in greatest.iteritems():
+		max_no = v
+		max_name = k
+	potential = []
+	potential.append(max_name)
+	print "ExtractCorrectAnswer 2"
+	for element in result:
+		for key,value in element.iteritems():
+			if value >= max_no*0.70 and key!=max_name:
+				print value
+				potential.append(key)
+	print potential
+	return potential
+                
 
 def extractWithStanfordNer(question):
 	resultArray = []
 	#data = extractNounAndVerb(question)
 	text =  searchContext(question)
-	#print text
+	print text
 	result = extractSimilarSentences(text[1],text[2],text[0],question)
-	#print result
+	
+	
 	classifier_tag = Qc.classify_question(classifier,[question])
-	lastResult = []
-	a = []
-	for sentence in result:
-		recieved_data_from_server = clientSocket.analyzeSentence(sentence)
-		checkInfo = searchAnswer.checkIfTag(classifier_tag,recieved_data_from_server)
-		if checkInfo[0]:
-			splitted_sentence = recieved_data_from_server.split(" ")
-			a = extractRelations(splitted_sentence,checkInfo[2],resultArray)
-			lastResult.append(a)
-	return countSucessful(a,text[1])
+	print classifier_tag
+	if classifier_tag[0] == "NUM":
+		
+		print "burada cokuyor"
+		
+		return [extractDates(result), ""]
+	
+	
+	elif  classifier_tag[0] == "HUM" or classifier_tag[0] == "LOC":
+		lastResult = []
+		a = []
+		for i in range(0,len(result)):
+			if ","  in result[i]:
+				result[i]  = result[i].replace("," , " ,")
+				
+		
+			recieved_data_from_server = clientSocket.analyzeSentence(result[i])
+			checkInfo = searchAnswer.checkIfTag(classifier_tag,recieved_data_from_server)
+			
+			if checkInfo[0]:
+				splitted_sentence = recieved_data_from_server.split(" ")
+			
+				a = extractRelations(splitted_sentence,checkInfo[2],resultArray)
+				lastResult.append(a)
+		print a
+		print "niyeeeee"
+		
+		
+		count_result =countSuccessful2(a,text[1])
+		
+		print "gelemedim buraya"
+		print count_result
+		
+		
+		
+		correct_answer = extractCorrectAnswers(count_result)
+		for i in range(0,len(correct_answer)):
+			correct_answer[i] = correct_answer[i][1:]
+		
+		
+		print correct_answer
+		img = []
+		for element in correct_answer:
+			element_appended = findImage(element)
+			if element_appended != None:
+				img.append(element_appended)
 
+		print  img
+		
+		return [correct_answer, img]
+	elif classifier_tag[0] == "DESC" or classifier_tag[0] == "ENTY":
+		text =text[1]
+		img=findImage(text)
+		print text
+		mysummary = wikipedia.summary(text)
+		print mysummary
+		return [[mysummary],[img]]		
+	else:
+		return 	[["This is  not a proper question"], ""]
 
 
 
 def searchContext(sentence):
 	stemmer2 = PorterStemmer()
 	posed_data = possingData(sentence)
-	verb = [element for element in posed_data if  'VB' in element[1] and element[0] not in stop_words ]
-	verb =  stemmer2.stem(verb[0][0])
+	
+	verb = [element for element in posed_data if  'VB' in element[1]] 
+	if len(verb) <= 1 and verb[0][0] in stop_words:
+		verbs = verb[0][0]
+		
+	else:
+		verbs= [element for element in verb if element[0] not in stop_words]
+		verbs =  stemmer2.stem(verb[0][0])        
+	
 	nlist = findingPossibleName(posed_data)
-	name = nlist[0]
-	return (myGetForTest(nlist), name , verb)
+	noun_data = findWiki(nlist)
+	print "name:" + noun_data[1]
+	return (noun_data[0], noun_data[1] , verbs)
 
 
+def findCorrectAnswer(listCountedName):
+	maxim = 0
+	correctAnswer = ""
+
+	for element in listCountedName:
+		for key,value in element.iteritems():
+			if value >= maxim:
+				maxim = value
+				correctName = key
+			elif value == maxim:
+				correctName = correctName if len(correctName) > len(key) else key
+	return correctName
+
+def findImage(name):
+        page = wikipedia.page(name).images
+        splittedName = name.split(" ")
+        for index in range(0,len(page)):
+                for element in splittedName:
+                        if element in page[index]:
+							print element, index
+							return page[index]
 
 
 #question = "Where was Gandhi assassinated?"

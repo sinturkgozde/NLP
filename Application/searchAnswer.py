@@ -17,10 +17,13 @@ resultArray = [["Linus Torvalds,Ken"],["Richard","Kerem"]]
 def checkIfTag(classifier_tag,recieved_data_from_server):
 	if classifier_tag[0] == "HUM":
 		return ("/PERSON" in recieved_data_from_server,recieved_data_from_server,"/PERSON")
-	elif classifier_tag[0] == "ENTIY":
+	elif classifier_tag[0] == "ENTY":
+		return ("/ORGANIZATION" in recieved_data_from_server,recieved_data_from_server,"/ORGANIZATION" )
+	elif classifier_tag[0] == "DESC":
 		return ("/ORGANIZATION" in recieved_data_from_server,recieved_data_from_server,"/ORGANIZATION")
 	elif classifier_tag[0] == "LOC":
 		return ("/LOCATION" in recieved_data_from_server,recieved_data_from_server,"/LOCATION")
+
 
 #sentence = raw_input("Enter a sentence:")
 

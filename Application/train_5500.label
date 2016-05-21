@@ -63,7 +63,7 @@ DESC:def What does `` extended definition '' mean and how would one write a pape
 LOC:country What country 's capital is Tirana ?
 DESC:def What is titanium ?
 HUM:ind Who do Herb and Tootsie live next door to ?
-LOC:city Which city has the oldest relationship as a sisterðcity with Los Angeles ?
+LOC:city Which city has the oldest relationship as a sisterï¿½city with Los Angeles ?
 DESC:def What is a caldera ?
 DESC:reason Why do people get calluses ?
 LOC:other What are the names of the tourist attractions in Reims ?
@@ -97,9 +97,15 @@ DESC:def What is the meaning of Jesus ?
 HUM:gr What company 's logo is a `` W '' in a circle ?
 DESC:def What is the definition of a cascade ?
 NUM:date When did Rococo painting and architecture flourish ?
-LOC:country What country 's national passenger rail system is called Via ?
-HUM:ind Who invented Make-up ?
-DESC:desc What is the origin of the word `` attic '' ?
+NUM:date When was Gandhi assassinated ?
+NUM:date When Fax Machine invented?
+NUM:date When was Microsoft founded  ?
+NUM:date When were Kennedy's won election?
+NUM:date When were a clockwork orange published?
+NUM:date When was Rococo painting and architecture flourish ?
+NUM:date When was Bill Gates born ?
+NUM:date When was Steve Jobs killed ?
+NUM:date When was Barton Fink directed?
 DESC:desc What did Delilah do to Samson 's hair ?
 ENTY:animal What kind of animals were in the Paleozoic era ?
 HUM:ind Which of the following was Rhodes Scholar ?

@@ -32,15 +32,13 @@ def classify_question(classifier,test_sentence):
     vectorized_test = count_vectorizer.transform(test_sentence)
     return classifier.predict(vectorized_test)
 
-"""
+
 
 arr = readData("train_5500.label")
 
 classifier = trainMachine(arr[0],arr[1])
 
 
-test_sentence = ["How many people do live in Istanbul"]
+test_sentence = ["?"]
 
-print classify_question(classifier,test_sentence)
 
-"""

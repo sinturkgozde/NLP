@@ -38,3 +38,4 @@ def prepareHyponyms(word):
   
 def merge_Hyp_Sys(word):
  return prepareHyponyms(word)+generateSynonymList(word) 
+ 
