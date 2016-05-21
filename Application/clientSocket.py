@@ -1,5 +1,16 @@
+
+
 import socket
 import sys
+
+
+"""
+
+    Java Stanford Ner aplikasyonu client socket
+
+"""
+
+
 
 TCP_IP= '127.0.0.1'
 TCP_PORT = 3150
@@ -25,21 +36,6 @@ def analyzeSentence(sentence):
 
 
 
-
-
-
-
-
-
-#while True:
-#		data = s.recv(2048)
-#		print not data
-#		if not data: 
-#			break
-#		total_data.append(data)
-#	print not data
-#		print total_data
-#	return ''.join(total_data)
 
 
 

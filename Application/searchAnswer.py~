@@ -1,0 +1,28 @@
+import QuestionClassification as Qc
+import clientSocket
+
+#!/usr/bin/env python
+# -*- coding: utf-8 -*- 
+
+
+'''
+
+	Bu method work.py sınıfının extractWithStanfordNer methodunda çağırılır.
+	Stanford NER'den aldığımız etiketleri(Person,  Location, Organization) 
+	train_5500 modelinin içinde QuestionClassification methodu ile
+	etiketlendirdiğimiz labelları eşleştirir(Hum, Enty, Desc, Loc, Num).
+	
+		
+'''
+
+def checkIfTag(classifier_tag,recieved_data_from_server):
+	if classifier_tag[0] == "HUM":
+		return ("/PERSON" in recieved_data_from_server,recieved_data_from_server,"/PERSON")
+	elif classifier_tag[0] == "ENTY":
+		return ("/ORGANIZATION" in recieved_data_from_server,recieved_data_from_server,"/ORGANIZATION" )
+	elif classifier_tag[0] == "DESC":
+		return ("/ORGANIZATION" in recieved_data_from_server,recieved_data_from_server,"/ORGANIZATION")
+	elif classifier_tag[0] == "LOC":
+		return ("/LOCATION" in recieved_data_from_server,recieved_data_from_server,"/LOCATION")
+
+

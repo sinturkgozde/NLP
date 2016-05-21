@@ -1,10 +1,10 @@
+
 from flask import Flask,request
 import nltk
 import os,sys
 import urllib2
 import re
 import work
-import Fetcher
 from time import strftime
 import QuestionClassification as Qc
 
@@ -12,16 +12,12 @@ app = Flask(__name__)
 
 
 
-#model = work.loadModel_two("our.model")
-
-
 @app.route("/",methods=['GET','POST'])
 def hello():
 	if request.method == 'POST':
 		question = request.form.get('pageContent')
 		result = work.extractWithStanfordNer(question)
-		print "geldim 1"
-		ectracted_result = result[0]
+		extracted_result = result[0]
 		imgUrl=  ""
 		imgStrPrefBeg =  "<img style=\"max-width:600;max-height:600;\" src=\""
 		imgStrPrefENd  =  "\"/>"
@@ -30,17 +26,13 @@ def hello():
 				imgUrl  += imgStrPrefBeg + element + imgStrPrefENd
 		else:
 			imgUrl = ""
-		print "cokmuyorum burada"
+		
 		reelResult = ""
 		for element in result[0]:
-			print type(element)
-			reelResult = reelResult+element+"<br>"
-		print "geldim 2"	
 			
-		#result2 = work.findCorrectAnswer(result)
-		#rrr = ""+result2[1:]
-		#imageUrl = work.findImage(rrr)
-                #resultCon = reduce(lambda x,y:x+"<br>"+y,result)
+			reelResult = reelResult+element+"<br>"
+		
+			
 		return "<title>Unicorn</title><p style=\"font-size:45px;\">The answer is:"+ reelResult +"</p>" + "<br>" + imgUrl
 
 	return """<html style=\" background:#DDDDDD\">

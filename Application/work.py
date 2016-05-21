@@ -16,16 +16,68 @@ from dateutil.parser import _timelex, parser
 from nltk.util import ngrams
 
 
+
+
+###################################################################
+'''
+    our.model adli modelimizde, kelimelerin birbirine yakinligi
+    ve semantik analizi gerceklestirilir.
+	
+	Gensim kutuphanesinin icinde bulunan Word2Vec yardimiyla modelimiz yuklenir.
+'''
 print "Model is loading..."
 model = Word2Vec.load("our.model")
 print "Model is loaded"
+#####################################################################
+
+
+
+#####################################################################
+'''
+	Nltk kutuphanesinin stop words adli moduludur., 
+	Ingilizce'de  kullanildigi cumlede anlam degistirmeyen kelimeleri elde ederiz.
+	Ornek: the, a, of, there vb.
+	Bu kelimeleri elememiz cumlede anlam aramamizda dogruluk payimizi artiracaktir.
+'''
 stop_words = stopwords.words("english")
 
 
-print "training question"
+#######################################################################
+
+
+
+#######################################################################
+'''
+	Train 5550 modelimizde, Ingilizce bircok soru ve etiketlendirilmesi vardir. 
+	Ornek : HUM:ind Who killed Gandhi ?
+	Sorunun siniflandirilmasi icin bu modelin egitilmesi gerekmektedir.
+	Gerekli ayrintilar QuestionClassification dosyasinda anlatilmistir.
+'''
+print "We are training question model..."
 arr = Qc.readData("train_5500.label")
 classifier = Qc.trainMachine(arr[0],arr[1])
-print "question is loaded"
+print "Question model is loaded!"
+
+
+#########################################################################
+
+
+#########################################################################
+'''
+
+	Possing Data methodunda amac gelen soru cumlesini WordNet'in Lemmatizer adli modulu yardimiyla kelime kelime ayirmak,
+	koklerini bulmak ve pos adi verilen isim, sifat, fiil vb etiketlendirilmesi yapilmasidir. Pos tagging islemi Nltk yardimiyla 
+	gerceklestirilir.
+	Ornek Soru Cumlesi : "Who directed A Clockwork Orange?"
+	Cikti              : ([('Who', 'WP'), ('directed', 'VBD'),('A', 'NNP'), ('Clockwork', 'NNP'), ('Orange', 'NNP')]
+
+	
+	WP: Wh-pronoun (What, Who)
+	VBD: Verb, past tense
+	NNP: Proper noun, sing
+	
+	
+'''
 
 def possingData(sentence):
 	stems = []
@@ -40,9 +92,400 @@ def possingData(sentence):
 	return nltk.pos_tag(question_tokenized)
 
 
+#############################################################################
 
 
 
+
+
+
+
+
+#############################################################################
+'''
+	Finding Possible Name methodunun amaci, possing data methodunda etiketlendirdigimiz kelimeleri kullanarak cumledeki isim ya da isim tamlamalarini bulmaktir.
+	"Who directed A Clockwork Orange?" sorusunda gitmemiz gereken baslik "A Clockwork Orange" oldugu uzere, ngram yolu ile etiketinde 'NN' gecen kelimelerle
+	farkli tamlamalar olusturulur.(A, A Clockwork, A Clockwork Orange vb)
+
+'''
+
+
+def findingPossibleName(posed_data):
+	noun = []
+	nlist = []
+	
+	for element in posed_data:
+		if "NN" in element[1]:
+			
+			noun.append(element[0])
+			
+	if len(noun) <= 1:
+		return noun
+	
+	for i in range(0,len(noun)+1):
+		aa = ngrams(noun, i+1)
+		for a in aa:
+			st = ""
+			for i in range(0,len(a)):
+				st = st + " " + a[i]
+			nlist.append(st)	
+	return nlist
+
+
+''''
+	Dondurulen isim tamlamalarinin Wikipedia'da basligi var mi diye kontrolu yapilir. A Clockwork Orange basligi aranilan isim tamlamasi alternatiflerinden 
+	en mantikli olani oldugu icin asil aranilan isim olarak "name" olarak tutulur. 
+	
+	wiki, wikipedia uzerinden "name" olarak etiketlendirdigimiz A Clockwork Orange filminin sayfasina gider, ve butun icerigi ceker.
+'''
+def findWiki(nlist):
+	nameList = []
+	for i in nlist:
+		try:
+			for element in wikipedia.search(i):
+				if wikipedia.page(i).title == wikipedia.page(element).title:
+					nameList.append(i)
+		except:
+			pass
+	name = max(nameList, key=len)
+	wiki =wikipedia.page(name).content.replace("\n","").replace("=","").replace('\\',"").split(".")	
+	org_name = wikipedia.page(name).title.decode('iso-8859-9').encode('utf-8',',ignore')	
+	if "(" in org_name:
+		org_name_index= org_name[0:org_name.index(" (")]
+	else:
+		org_name_index = org_name
+	
+	return (wiki,org_name_index) 
+
+############################################################################
+
+
+
+
+
+#############################################################################
+
+'''
+	Search Context methodunda amac Possing Data'dan itibaren yazdigimiz methodlari birlestirir.
+	cikti : Wikipedia icerigi, Isim(A Clockwork Orange), Fiil (directed)
+
+'''
+def searchContext(sentence):
+	stemmer2 = PorterStemmer()
+	posed_data = possingData(sentence)
+	
+	verb = [element for element in posed_data if  'VB' in element[1]] 
+	if len(verb) <= 1 and verb[0][0] in stop_words:
+		verbs = verb[0][0]
+		
+	else:
+		verbs= [element for element in verb if element[0] not in stop_words]
+		verbs =  stemmer2.stem(verb[0][0])        
+	
+	nlist = findingPossibleName(posed_data)
+	
+	noun_data = findWiki(nlist)
+	
+	return (noun_data[0], noun_data[1] , verbs)
+	
+	
+#############################################################################
+
+
+
+
+#############################################################################
+'''
+	Girdiler: Isim, fiil, wiki datasi, soru
+	
+	Eger fiilimiz stopwords icinde degilse, helper classindaki merge_Hyp_Sys methodu ile, fiilimizin yakin ve esanlamlilarini bulur.
+	Yakinlilik orani 0.35 in altinda olan fiiller filtrelenir. 
+	
+	
+	Ikinci kisimda Wikipedia'da ilgili basliktan cektigimiz datanin icinde,  yukarida elde ettigimiz fiil listesini arar ilgili cumleleri tutariz.
+	
+	
+'''
+
+
+def extractSimilarSentences(noun,verb,data,question):
+	stemmer = PorterStemmer()
+	wordnet_lemmatizer = WordNetLemmatizer()
+	result_array=[]
+	if verb not in stop_words:
+		sim_hyp_verb= helper.merge_Hyp_Sys(verb)
+		sim_hyp_verb= filter(lambda x: x in model.vocab, sim_hyp_verb)
+		similarity_checking= filter(lambda x:model.similarity(x,verb) > 0.35, sim_hyp_verb)
+		sentence_no = 0
+		
+		for sentence in data:
+			for word in nltk.word_tokenize(sentence):
+				if stemmer.stem(word) in map(lambda x:stemmer.stem(x),similarity_checking) :
+					result_array.append(str(sentence_no) +" "+sentence)
+		 
+		return result_array					
+	elif verb in stop_words:
+		for elem in data:
+			result_array.append(elem)
+		
+		return result_array
+	
+
+
+############################################################################
+'''
+	
+
+'''
+
+def extractRelations(splitted_sentence,classifier_tag,resultArray):
+	before = False
+	together=""
+	for i in range(0,len(splitted_sentence)):
+		if classifier_tag in splitted_sentence[i]:
+			before=True
+			if before:
+			 together = together +" "+ splitted_sentence[i][:splitted_sentence[i].index("/")]
+		else:
+			if together != "":
+				if together not in resultArray:
+					resultArray.append(together)
+			before=False
+			together = ""
+	if together != "":
+		resultArray.append(together)
+	return resultArray
+
+
+################################################################################################
+'''
+	Wikipedia'daki butun ilgili icerigi doner.
+
+'''
+
+def extractPossible(searchNoun ,noun):
+    content = ""
+    try:
+        searchNounTitle = wikipedia.page(searchNoun).title
+        nounTitle = wikipedia.page(noun).title
+        if len(wikipedia.search(noun)) > 0 and searchNoun != wikipedia.search(noun)[0] and searchNounTitle != nounTitle:
+            content = wikipedia.page(noun).content
+    except Exception:
+        pass
+    return content
+
+	
+##########################################################################################
+
+
+
+#############################################################################################
+
+'''
+	Count Succesful methodu Stanford NER'den donen olasi "Who directed A Clockwork Orange" cevaplarinin(bir dizi insan ismi) wikipedia sayfalarinda
+	soruda asil gecen ismi arar ve siklik taramasina gore yakinligi test eder. Multiprocessing ile ayni anda farkli isimlerin wikipedialarinda A CLockwork Orange
+	ismi aranir. En cok siklik donduren isimler, dogru cevap olarak alinir.
+	
+	
+'''
+
+
+def start_process():
+    print 'Starting', multiprocessing.current_process().name
+	
+def countSuccessful(array,searchNoun):
+	func = partial(extractPossible, searchNoun)
+	pool_size =multiprocessing.cpu_count() * 2
+	#pool_size = multiprocessing.Pool(len(array))
+	pool =multiprocessing.Pool(processes=pool_size,initializer=start_process )                          
+                                
+	
+	results = pool.map(func, array)
+	
+	mainResult = []
+	for i in range(0, len(array)):
+		
+		mainResult.append(searchTermInDoc(results[i],searchNoun,array[i]))
+	
+	pool.close()
+	pool.join()
+    
+	pool.terminate()
+	
+	return mainResult	
+
+#####  Dokuman icinde siklik taramasini gerceklestirir.###########
+def searchTermInDoc(doc,term,title):
+	counter  = 0
+	dict = {}
+	sentences = doc.split(".")
+	for sentence in sentences:
+		if term in sentence:
+			counter = counter+1
+	return {title:counter}
+
+###################################################################
+
+
+
+
+
+###################################################################
+'''
+	Siklik taramasinda en yuksek orandaki sonuclari %70 gibi bir yakinlik kistasiyla doner.
+
+'''
+def findMaximumAnswer(listCountedName):
+	maxValue = 0
+	correctAnswer = {}
+	max_key = ""
+	
+	for element in listCountedName:
+		
+		for key, value in element.iteritems():
+			if value >= maxValue:
+				
+				maxValue = value
+				correctAnswer = element
+	
+	return correctAnswer
+
+
+
+def extractCorrectAnswers(result):
+	greatest = findMaximumAnswer(result)
+	max_no = 0
+	max_name = ""
+	
+	for k,v in greatest.iteritems():
+		max_no = v
+		max_name = k
+	potential = []
+	potential.append(max_name)
+	
+	for element in result:
+		for key,value in element.iteritems():
+			if value >= max_no*0.70 and key!=max_name:
+				
+				potential.append(key)
+	
+	return potential
+	
+#########################################################################
+
+	
+'''
+	Ana Method
+	
+	Kosullar sorunun siniflandirilmasina gore gerceklestirilir.
+	Oc QuestionClassification classindan sorunun ilgili sinifini ceker.
+	
+	Ornek: "Who directed A Clockwork Orange?"
+	Sonuc: [HUM]
+	
+	{Java Stanford Ner denilen Name Entity Recognizer bize Person etiketiyle (kisileri) doner.}
+	
+	Kosullar : /NUM(numerik) {Tarih vb numerik sonuclar}
+			   /HUM(insan) 
+	   		   /LOC(location)
+		       /DESC(aciklama)
+			   /ENTY(varlik)
+
+
+
+'''               
+
+def extractWithStanfordNer(question):
+	resultArray = []
+	text =  searchContext(question)
+	result = extractSimilarSentences(text[1],text[2],text[0],question)
+	
+	
+	
+	classifier_tag = Qc.classify_question(classifier,[question])
+	
+	if classifier_tag[0] == "NUM":
+		
+		return [extractDates(result), ""]
+	
+	
+	elif  classifier_tag[0] == "HUM" or classifier_tag[0] == "LOC":
+		lastResult = []
+		a = []
+		for i in range(0,len(result)):
+			if ","  in result[i]:
+				result[i]  = result[i].replace("," , " ,")
+				
+		
+			recieved_data_from_server = clientSocket.analyzeSentence(result[i])
+			checkInfo = searchAnswer.checkIfTag(classifier_tag,recieved_data_from_server)
+			
+			
+			if checkInfo[0]:
+				splitted_sentence = recieved_data_from_server.split(" ")
+				a = extractRelations(splitted_sentence,checkInfo[2],resultArray)
+				lastResult.append(a)
+		count_result =countSuccessful(a,text[1])
+		
+		
+		
+		correct_answer = extractCorrectAnswers(count_result)
+		for i in range(0,len(correct_answer)):
+			correct_answer[i] = correct_answer[i][1:]
+		
+		
+		img = []
+		for element in correct_answer:
+			element_appended = findImage(element)
+			if element_appended != None:
+				img.append(element_appended)
+
+		
+		return [correct_answer, img]
+	elif classifier_tag[0] == "DESC" or classifier_tag[0] == "ENTY":
+		text =text[1]
+		img=findImage(text)
+		mysummary = wikipedia.summary(text)
+		
+		return [[mysummary],[img]]		
+	else:
+		return 	[["This is  not a proper question"], ""]
+
+
+
+
+
+	
+	
+	
+###############################################################################################
+
+'''
+	Find  Image methodu dondurdugumuz cevaplarin Wikipedia'daki ilgili resimlerini doner.
+
+'''
+def findImage(name):
+        page = wikipedia.page(name).images
+        splittedName = name.split(" ")
+        for index in range(0,len(page)):
+                for element in splittedName:
+                        if element in page[index]:
+							
+							return page[index]
+
+#################################################################################################
+
+
+
+
+
+
+
+########################################################################################################
+'''
+	Date parser icin gerekli implementasyonlar.
+	
+'''
 p = parser()
 info = p.info
 
@@ -77,337 +520,4 @@ def extractDates(text):
 				result.append(sentence)
     return result
 
-
-def findingPossibleName(posed_data):
-	noun = []
-	nlist = []
-	print posed_data
-	for element in posed_data:
-		if "NN" in element[1]:
-			print element
-			noun.append(element[0])
-	if len(noun) <= 1:
-		return noun
-	for i in range(0,len(noun)+1):
-		aa = ngrams(noun, i+1)
-		print "Yeter yeter"
-		for a in aa:
-			st = ""
-			for i in range(0,len(a)):
-				st = st + " " + a[i]
-			nlist.append(st)
-	print nlist
-	return nlist
-
-def findWiki(nlist):
-	print "findWiki"
-	nameList = []
-	for i in nlist:
-		try:
-			for element in wikipedia.search(i):
-				if wikipedia.page(i).title == wikipedia.page(element).title:
-					nameList.append(i)
-		except:
-			pass
-	print nameList
-	name = max(nameList, key=len)
-	print "findWiki" + name 
-	wiki =wikipedia.page(name).content.replace("\n","").replace("=","").replace('\\',"").split(".")	
-	org_name = wikipedia.page(name).title.decode('iso-8859-9').encode('utf-8',',ignore')	
-	org_name_indexed = org_name[0:org_name.index(" (")]
-	print "cokmedim burada" + org_name_indexed
-	return (wiki,org_name_indexed) 
-
-
-
-
-def myGetForTest(possibleNameList):
-	for i in possibleNameList:
-	 	if wikipedia.search(i) is not [] :
-			return wikipedia.page(i).content.replace("\n","").replace("=","").replace('\\',"").split(".")
-
-def stemmer(sentence):
-	word_list = []
-	stop_words = stopwords.words("english")
-	wordnet_lemmatizer = WordNetLemmatizer()
-	tok_sen = nltk.word_tokenize(sentence)
-	for word in tok_sen:
-		if word not in stop_words:
-			word_list.append(wordnet_lemmatizer.lemmatize(word))
-		else:
-			word_list.append(str(word))
-
-	return word_list
-
-
-def extractSimilarSentences(noun,verb,data,question):
-	stemmer = PorterStemmer()
-	wordnet_lemmatizer = WordNetLemmatizer()
-	result_array=[]
-	print verb
-	if verb not in stop_words:
-		sim_hyp_verb= helper.merge_Hyp_Sys(verb)
-		sim_hyp_verb= filter(lambda x: x in model.vocab, sim_hyp_verb)
-		similarity_checking= filter(lambda x:model.similarity(x,verb) > 0.35, sim_hyp_verb)
-		sentence_no = 0
-		
-		for sentence in data:
-			#recieved_data_from_server = clientSocket.analyzeSentence(sentence)
-			for word in nltk.word_tokenize(sentence):
-				if stemmer.stem(word) in map(lambda x:stemmer.stem(x),similarity_checking) :
-					result_array.append(str(sentence_no) +" "+sentence)
-		return result_array					
-	elif verb in stop_words:
-		for elem in data:
-			result_array.append(elem)
-			
-		return result_array
-	
-
-
-
-
-
-
-#and searchAnswer.checkIfTag(classifier_tag,recieved_data_from_server)
-
-
-
-def extractRelations(splitted_sentence,classifier_tag,resultArray):
-	before = False
-	togather=""
-	for i in range(0,len(splitted_sentence)):
-		if classifier_tag in splitted_sentence[i]:
-			before=True
-			if before:
-			 togather = togather +" "+ splitted_sentence[i][:splitted_sentence[i].index("/")]
-		else:
-			if togather != "":
-				if togather not in resultArray:
-					resultArray.append(togather)
-			before=False
-			togather = ""
-	if togather != "":
-		resultArray.append(togather)
-	return resultArray
-
-
-
-
-def extractPossible2(searchNoun ,noun):
-    content = ""
-    try:
-        searchNounTitle = wikipedia.page(searchNoun).title
-        nounTitle = wikipedia.page(noun).title
-        if len(wikipedia.search(noun)) > 0 and searchNoun != wikipedia.search(noun)[0] and searchNounTitle != nounTitle:
-            content = wikipedia.page(noun).content
-    except Exception:
-        pass
-    return content
-def start_process():
-    print 'Starting', multiprocessing.current_process().name
-	
-def countSuccessful2(array,searchNoun):
-	func = partial(extractPossible2, searchNoun)
-	pool_size =multiprocessing.cpu_count() * 2
-	#pool_size = multiprocessing.Pool(len(array))
-	pool =multiprocessing.Pool(processes=pool_size,initializer=start_process )                          
-                                
-	
-	results = pool.map(func, array)
-	
-	mainResult = []
-	for i in range(0, len(array)):
-		print i
-		mainResult.append(searchTermInDoc(results[i],searchNoun,array[i]))
-	
-	pool.close()
-	pool.join()
-    
-	pool.terminate()
-	print results
-	return mainResult	
-
-
-def searchTermInDoc(doc,term,title):
-	counter  = 0
-	dict = {}
-	sentences = doc.split(".")
-	for sentence in sentences:
-		if term in sentence:
-			counter = counter+1
-	return {title:counter}
-
-
-
-
-#url = "https://en.wikipedita.org/wiki/Mahatma_Gandhi"
-#html = urllib2.urlopen(url).read().decode('iso-8859-9').encode('utf-8',',ignore')
-#soup = BeautifulSoup(html,"html.parser")
-#raw = soup.get_text()
-#second_data = raw[:raw.index("Refereinces\n\n")].split(".")
-
-def findMaximumAnswer(listCountedName):
-	print "findMaximumAnswer"
-	maxValue = 0
-	correctAnswer = {}
-	max_key = ""
-	print listCountedName
-	for element in listCountedName:
-		print element
-		for key, value in element.iteritems():
-			if value >= maxValue:
-				print key, value
-				maxValue = value
-				correctAnswer = element
-	print correctAnswer
-	return correctAnswer
-
-def extractCorrectAnswers(result):
-	greatest = findMaximumAnswer(result)
-	max_no = 0
-	max_name = ""
-	print "ExtractCorrectAnswer 1"
-	for k,v in greatest.iteritems():
-		max_no = v
-		max_name = k
-	potential = []
-	potential.append(max_name)
-	print "ExtractCorrectAnswer 2"
-	for element in result:
-		for key,value in element.iteritems():
-			if value >= max_no*0.70 and key!=max_name:
-				print value
-				potential.append(key)
-	print potential
-	return potential
-                
-
-def extractWithStanfordNer(question):
-	resultArray = []
-	#data = extractNounAndVerb(question)
-	text =  searchContext(question)
-	print text
-	result = extractSimilarSentences(text[1],text[2],text[0],question)
-	
-	
-	classifier_tag = Qc.classify_question(classifier,[question])
-	print classifier_tag
-	if classifier_tag[0] == "NUM":
-		
-		print "burada cokuyor"
-		
-		return [extractDates(result), ""]
-	
-	
-	elif  classifier_tag[0] == "HUM" or classifier_tag[0] == "LOC":
-		lastResult = []
-		a = []
-		for i in range(0,len(result)):
-			if ","  in result[i]:
-				result[i]  = result[i].replace("," , " ,")
-				
-		
-			recieved_data_from_server = clientSocket.analyzeSentence(result[i])
-			checkInfo = searchAnswer.checkIfTag(classifier_tag,recieved_data_from_server)
-			
-			if checkInfo[0]:
-				splitted_sentence = recieved_data_from_server.split(" ")
-			
-				a = extractRelations(splitted_sentence,checkInfo[2],resultArray)
-				lastResult.append(a)
-		print a
-		print "niyeeeee"
-		
-		
-		count_result =countSuccessful2(a,text[1])
-		
-		print "gelemedim buraya"
-		print count_result
-		
-		
-		
-		correct_answer = extractCorrectAnswers(count_result)
-		for i in range(0,len(correct_answer)):
-			correct_answer[i] = correct_answer[i][1:]
-		
-		
-		print correct_answer
-		img = []
-		for element in correct_answer:
-			element_appended = findImage(element)
-			if element_appended != None:
-				img.append(element_appended)
-
-		print  img
-		
-		return [correct_answer, img]
-	elif classifier_tag[0] == "DESC" or classifier_tag[0] == "ENTY":
-		text =text[1]
-		img=findImage(text)
-		print text
-		mysummary = wikipedia.summary(text)
-		print mysummary
-		return [[mysummary],[img]]		
-	else:
-		return 	[["This is  not a proper question"], ""]
-
-
-
-def searchContext(sentence):
-	stemmer2 = PorterStemmer()
-	posed_data = possingData(sentence)
-	
-	verb = [element for element in posed_data if  'VB' in element[1]] 
-	if len(verb) <= 1 and verb[0][0] in stop_words:
-		verbs = verb[0][0]
-		
-	else:
-		verbs= [element for element in verb if element[0] not in stop_words]
-		verbs =  stemmer2.stem(verb[0][0])        
-	
-	nlist = findingPossibleName(posed_data)
-	noun_data = findWiki(nlist)
-	print "name:" + noun_data[1]
-	return (noun_data[0], noun_data[1] , verbs)
-
-
-def findCorrectAnswer(listCountedName):
-	maxim = 0
-	correctAnswer = ""
-
-	for element in listCountedName:
-		for key,value in element.iteritems():
-			if value >= maxim:
-				maxim = value
-				correctName = key
-			elif value == maxim:
-				correctName = correctName if len(correctName) > len(key) else key
-	return correctName
-
-def findImage(name):
-        page = wikipedia.page(name).images
-        splittedName = name.split(" ")
-        for index in range(0,len(page)):
-                for element in splittedName:
-                        if element in page[index]:
-							print element, index
-							return page[index]
-
-
-#question = "Where was Gandhi assassinated?"
-#print possingData(question)
-#print extractSimilarSentences("Gandhi","kill",second_data,model)[4]
-#print (x for x in extractSimilarSentences("Gandhi","kill",second_data,model))
-
-
-
-#model = Word2Vec.load("our.model")
-
-#arr = Fetcher.merge_Hyp_Sys("kill")
-
-#result_hyponym2 = filter(lambda x:model.similarity(x,"kill")>0.0 and x in model.vocab,arr)
-#print arr
-#print result_hyponym2
-#print  extractNounAndVerb("When was Bilgi University found?")
-#print map(lambda x:str(x),Fetcher.merge_Hyp_Sys("kill"))
+########################################################################################################################

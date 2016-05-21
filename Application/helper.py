@@ -1,7 +1,14 @@
+
 import wikipedia
 from nltk.corpus import wordnet as wn
 import nltk
-import urllib2
+
+
+'''
+     Bu method work.py sinifinda extractSimilarSentence  methodu icinde cagirilir.
+     Belli bir kelimenin hyponym ve synonymleri bulur.
+
+'''
 
 
 def generateSynonymList(word):

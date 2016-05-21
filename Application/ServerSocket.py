@@ -1,8 +1,12 @@
+
 import socket
 import sys
 
+"""
 
+    Java Stanford Ner aplikasyonu server socket
 
+"""
 
 
 TCP_IP= '127.0.0.1'

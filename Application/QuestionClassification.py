@@ -1,5 +1,4 @@
 import os,sys
-
 from sklearn.naive_bayes import GaussianNB
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.feature_extraction.text import TfidfTransformer
@@ -7,6 +6,19 @@ from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
 import nltk
 
+
+"""
+
+    Bu sinif ana sinifimiz olan work.py sinifinin extractWithStanfordNer methodu icinde cagirilir.
+    
+    
+    Soru siniflandirilmasi icin Naive Bayes algoritmasini kullaniyoruz.
+    Naive Bayes algoritmasini implement etmek icin ise sklearn kutuphanesinin modullerini kullaniyoruz.
+    
+    Soru : "Who directed A Clockwork Orange?"
+    Classify Question methodu ciktisi : ['HUM']
+    
+"""
 count_vectorizer = CountVectorizer()
 
 
@@ -31,14 +43,5 @@ def trainMachine(sentences,target):
 def classify_question(classifier,test_sentence):
     vectorized_test = count_vectorizer.transform(test_sentence)
     return classifier.predict(vectorized_test)
-
-
-
-arr = readData("train_5500.label")
-
-classifier = trainMachine(arr[0],arr[1])
-
-
-test_sentence = ["?"]
 
 
